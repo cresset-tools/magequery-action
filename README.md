@@ -55,3 +55,7 @@ GitHub annotations with file and line information when available.
 ## Output
 
 `magequery-version` is the installed magequery version.
+
+## License
+
+Licensed under the [European Union Public Licence 1.2](LICENSE).
