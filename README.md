@@ -23,6 +23,7 @@ The default command is `magequery doctor`, which exits non-zero for broken stati
 | Input | Default | Description |
 | --- | --- | --- |
 | `version` | `latest` | Magequery release to install, such as `0.7.0`. |
+| `checksum` | release sidecar | Optional SHA-256 checksum for the downloaded archive. |
 | `args` | `doctor` | Any magequery command and its arguments. |
 | `root` | `.` | Magento project root. |
 | `github-token` | `${{ github.token }}` | Token used to resolve and download releases. |
@@ -44,8 +45,12 @@ Examples:
 - uses: cresset-tools/magequery-action@v1
   with:
     version: 0.7.0
-    args: 'di Magento\\Catalog\\Api\\ProductRepositoryInterface'
+    args: 'di Magento\Catalog\Api\ProductRepositoryInterface'
 ```
+
+Downloaded archives are verified against their release SHA-256 sidecars before extraction and
+stored in the GitHub runner tool cache. `doctor` and `modules --check` findings are emitted as
+GitHub annotations with file and line information when available.
 
 ## Output
 

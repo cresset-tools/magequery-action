@@ -11,6 +11,9 @@ inputs:
     description: Magequery version to install (for example, 0.7.0), or latest.
     required: false
     default: latest
+  checksum:
+    description: Optional SHA-256 checksum for the magequery archive; defaults to the release sidecar.
+    required: false
   args:
     description: Arguments to pass to magequery.
     required: false
@@ -30,4 +33,4 @@ outputs:
 
 runs:
   using: node24
-  main: index.js
+  main: dist/index.cjs
