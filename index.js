@@ -97,7 +97,7 @@ async function main() {
   const { binary, tag, binDir } = await install(requestedVersion, token);
 
   const { stdout } = await execFileAsync(binary, ["--version"]);
-  const version = stdout.trim();
+  const version = stdout.trim().replace(/^magequery\s+/, "");
   console.log(`Installed magequery ${version} from ${tag}`);
   process.env.PATH = `${binDir}${delimiter}${process.env.PATH}`;
   if (process.env.GITHUB_PATH) await writeFile(process.env.GITHUB_PATH, `${binDir}\n`, { flag: "a" });
