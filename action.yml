@@ -1,0 +1,33 @@
+name: magequery
+description: Install magequery and run a static check or query against a Magento 2 project.
+author: cresset-tools
+
+branding:
+  icon: search
+  color: purple
+
+inputs:
+  version:
+    description: Magequery version to install (for example, 0.7.0), or latest.
+    required: false
+    default: latest
+  args:
+    description: Arguments to pass to magequery.
+    required: false
+    default: doctor
+  root:
+    description: Path to the Magento root, relative to the workspace.
+    required: false
+    default: .
+  github-token:
+    description: Token used to resolve the latest magequery release and download release assets.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  magequery-version:
+    description: The magequery version that was installed.
+
+runs:
+  using: node24
+  main: index.js
