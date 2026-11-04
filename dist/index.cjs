@@ -23213,9 +23213,6 @@ function platformVariant() {
   if (platform2 === "darwin" && arch3 === "arm64") {
     return { target: "aarch64-apple-darwin", extension: ".tar.gz" };
   }
-  if (platform2 === "darwin" && arch3 === "x64") {
-    return { target: "x86_64-apple-darwin", extension: ".tar.gz" };
-  }
   if (platform2 === "win32" && arch3 === "x64") {
     return { target: "x86_64-pc-windows-msvc", extension: ".zip" };
   }
