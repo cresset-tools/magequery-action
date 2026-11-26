@@ -23156,6 +23156,17 @@ function _getGlobal(key, defaultValue) {
   return value !== void 0 ? value : defaultValue;
 }
 
+// src/doctor.js
+function choosesFormat(args) {
+  return args.some((arg) => arg === "--json" || arg === "--format" || arg.startsWith("--format="));
+}
+function helpOffersGithub(help) {
+  return /--format\b/.test(help) && /\bgithub\b/.test(help);
+}
+function withFormat(root, args, format) {
+  return ["--root", root, ...args, "--format", format];
+}
+
 // src/index.js
 var repository = "cresset-tools/magequery";
 var mirrorBase = "https://releases.bougie.tools/github/magequery/releases/download";
@@ -23345,7 +23356,37 @@ async function capturedRun(binary, args) {
   });
   return { exitCode, stdout, stderr };
 }
-async function runDoctor(binary, root, args) {
+async function supportsFormats(binary) {
+  const result = await capturedRun(binary, ["doctor", "--help"]);
+  return result.exitCode === 0 && helpOffersGithub(result.stdout);
+}
+async function writeSarif(binary, root, args, file) {
+  const result = await capturedRun(binary, withFormat(root, args.filter((arg) => arg !== "--json"), "sarif"));
+  try {
+    JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`magequery doctor --format sarif did not return valid JSON: ${result.stderr.trim()}`);
+  }
+  await (0, import_promises.writeFile)(file, result.stdout);
+  setOutput("sarif-file", file);
+  info(`Wrote the SARIF log to ${file}`);
+}
+async function runDoctor(binary, root, args, sarifFile) {
+  const formats = await supportsFormats(binary);
+  if (sarifFile && !formats) {
+    warning("sarif-file needs magequery with `doctor --format sarif`; no SARIF log was written");
+  }
+  if (formats) {
+    if (sarifFile) await writeSarif(binary, root, args, sarifFile);
+    if (!choosesFormat(args)) {
+      const exitCode = await exec(binary, withFormat(root, args, "github"), { ignoreReturnCode: true });
+      if (exitCode !== 0) throw new Error(`magequery exited with code ${exitCode}`);
+      return;
+    }
+  }
+  return runDoctorJson(binary, root, args);
+}
+async function runDoctorJson(binary, root, args) {
   const requestedJson = args.includes("--json");
   const commandArgs = ["--root", root, ...args, ...requestedJson ? [] : ["--json"]];
   const result = await capturedRun(binary, commandArgs);
@@ -23400,9 +23441,10 @@ async function runModuleCheck(binary, root, args) {
   if (result.exitCode !== 0) throw new Error(`magequery exited with code ${result.exitCode}`);
   info("magequery modules --check: module registration is consistent");
 }
-async function runMagequery(binary, root, args) {
+async function runMagequery(binary, root, args, sarifFile) {
   const help = args.includes("--help") || args.includes("-h");
-  if (!help && args[0] === "doctor") return runDoctor(binary, root, args);
+  if (!help && args[0] === "doctor") return runDoctor(binary, root, args, sarifFile);
+  if (sarifFile) warning("sarif-file applies to `doctor` only; no SARIF log was written");
   if (!help && args[0] === "modules" && args.includes("--check")) {
     return runModuleCheck(binary, root, args);
   }
@@ -23418,11 +23460,12 @@ async function main() {
   const args = splitArgs(getInput("args") || "doctor");
   const root = getInput("root") || ".";
   const checksum = getInput("checksum").trim();
+  const sarifFile = getInput("sarif-file").trim();
   const installed = await install(tag, token, checksum);
   addPath(installed.directory);
   setOutput("magequery-version", installed.version);
   info(`Installed magequery ${installed.version} from ${tag}`);
-  await runMagequery(installed.binary, root, args);
+  await runMagequery(installed.binary, root, args, sarifFile);
 }
 main().catch((error2) => setFailed(error2 instanceof Error ? error2.message : String(error2)));
 /*! Bundled license information:

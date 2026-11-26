@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as toolCache from "@actions/tool-cache";
+
+import { choosesFormat, helpOffersGithub, withFormat } from "./doctor.js";
 
 const repository = "cresset-tools/magequery";
 const mirrorBase = "https://releases.bougie.tools/github/magequery/releases/download";
@@ -217,7 +219,44 @@ async function capturedRun(binary, args) {
   return { exitCode, stdout, stderr };
 }
 
-async function runDoctor(binary, root, args) {
+async function supportsFormats(binary) {
+  const result = await capturedRun(binary, ["doctor", "--help"]);
+  return result.exitCode === 0 && helpOffersGithub(result.stdout);
+}
+
+async function writeSarif(binary, root, args, file) {
+  const result = await capturedRun(binary, withFormat(root, args.filter((arg) => arg !== "--json"), "sarif"));
+  try {
+    JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`magequery doctor --format sarif did not return valid JSON: ${result.stderr.trim()}`);
+  }
+  await writeFile(file, result.stdout);
+  core.setOutput("sarif-file", file);
+  core.info(`Wrote the SARIF log to ${file}`);
+}
+
+async function runDoctor(binary, root, args, sarifFile) {
+  const formats = await supportsFormats(binary);
+  if (sarifFile && !formats) {
+    core.warning("sarif-file needs magequery with `doctor --format sarif`; no SARIF log was written");
+  }
+  if (formats) {
+    // Written before the gate below, so a failing run still uploads its log.
+    if (sarifFile) await writeSarif(binary, root, args, sarifFile);
+    if (!choosesFormat(args)) {
+      // magequery prints the annotations itself, with paths relative to the
+      // workspace this runs in.
+      const exitCode = await exec.exec(binary, withFormat(root, args, "github"), { ignoreReturnCode: true });
+      if (exitCode !== 0) throw new Error(`magequery exited with code ${exitCode}`);
+      return;
+    }
+  }
+  return runDoctorJson(binary, root, args);
+}
+
+// Annotations from `--json`, for a magequery without `doctor --format github`.
+async function runDoctorJson(binary, root, args) {
   const requestedJson = args.includes("--json");
   const commandArgs = ["--root", root, ...args, ...(requestedJson ? [] : ["--json"])];
   const result = await capturedRun(binary, commandArgs);
@@ -278,9 +317,10 @@ async function runModuleCheck(binary, root, args) {
   core.info("magequery modules --check: module registration is consistent");
 }
 
-async function runMagequery(binary, root, args) {
+async function runMagequery(binary, root, args, sarifFile) {
   const help = args.includes("--help") || args.includes("-h");
-  if (!help && args[0] === "doctor") return runDoctor(binary, root, args);
+  if (!help && args[0] === "doctor") return runDoctor(binary, root, args, sarifFile);
+  if (sarifFile) core.warning("sarif-file applies to `doctor` only; no SARIF log was written");
   if (!help && args[0] === "modules" && args.includes("--check")) {
     return runModuleCheck(binary, root, args);
   }
@@ -297,12 +337,13 @@ async function main() {
   const args = splitArgs(core.getInput("args") || "doctor");
   const root = core.getInput("root") || ".";
   const checksum = core.getInput("checksum").trim();
+  const sarifFile = core.getInput("sarif-file").trim();
 
   const installed = await install(tag, token, checksum);
   core.addPath(installed.directory);
   core.setOutput("magequery-version", installed.version);
   core.info(`Installed magequery ${installed.version} from ${tag}`);
-  await runMagequery(installed.binary, root, args);
+  await runMagequery(installed.binary, root, args, sarifFile);
 }
 
 main().catch((error) => core.setFailed(error instanceof Error ? error.message : String(error)));

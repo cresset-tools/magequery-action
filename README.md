@@ -26,6 +26,7 @@ The default command is `magequery doctor`, which exits non-zero for broken stati
 | `checksum` | release sidecar | Optional SHA-256 checksum for the downloaded archive. |
 | `args` | `doctor` | Any magequery command and its arguments. |
 | `root` | `.` | Magento project root. |
+| `sarif-file` | _(none)_ | For `doctor`, also write a SARIF 2.1.0 log here, for code scanning. |
 | `github-token` | `${{ github.token }}` | Token used to resolve and download releases. |
 
 Examples:
@@ -46,11 +47,23 @@ Examples:
   with:
     version: 0.7.0
     args: 'di Magento\Catalog\Api\ProductRepositoryInterface'
+
+# Show doctor's findings in the Security tab too, failing or not.
+- uses: cresset-tools/magequery-action@v1
+  with:
+    sarif-file: magequery.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: magequery.sarif
 ```
 
 Downloaded archives are verified against their release SHA-256 sidecars before extraction and
 stored in the GitHub runner tool cache. `doctor` and `modules --check` findings are emitted as
-GitHub annotations with file and line information when available.
+GitHub annotations with file and line information when available. With a magequery that has
+`doctor --format github`, magequery writes doctor's annotations itself, which adds stale baseline
+entries and the chain explaining each finding's severity, and shows infos as notices rather than
+warnings. `sarif-file` needs that version too.
 
 ## Output
 
