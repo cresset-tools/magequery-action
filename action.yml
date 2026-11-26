@@ -22,6 +22,12 @@ inputs:
     description: Path to the Magento root, relative to the workspace.
     required: false
     default: .
+  sarif-file:
+    description: >-
+      For doctor, also write its findings as a SARIF 2.1.0 log to this path, for
+      github/codeql-action/upload-sarif. Written even when doctor fails.
+    required: false
+    default: ""
   github-token:
     description: Token used to resolve the latest magequery release and download release assets.
     required: false
@@ -30,6 +36,8 @@ inputs:
 outputs:
   magequery-version:
     description: The magequery version that was installed.
+  sarif-file:
+    description: The SARIF log written, when sarif-file was given.
 
 runs:
   using: node24

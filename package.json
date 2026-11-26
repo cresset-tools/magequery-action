@@ -6,6 +6,7 @@
   "license": "EUPL-1.2",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.js",
     "check": "node --check src/index.js && npm run build && git diff --exit-code -- dist/index.cjs"
   },
   "dependencies": {
